@@ -1,23 +1,45 @@
-<script>
-async function send() {
-    const text = document.getElementById("text").value;
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Academic Writing Tool</title>
+</head>
+<body>
 
-    const response = await fetch("/generate", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({text})
-    });
+    <h1>Academic Writing Tool</h1>
 
-    const data = await response.json();
+    <textarea id="text" placeholder="Enter your text here..." rows="6" cols="50"></textarea>
+    <br><br>
 
-    console.log(data); // 👈 VERY IMPORTANT
+    <button onclick="generateText()">Generate</button>
 
-    if (data.result) {
-        document.getElementById("result").innerText = data.result;
-    } else if (data.error) {
-        document.getElementById("result").innerText = "Error: " + data.error;
-    } else {
-        document.getElementById("result").innerText = "No response from server";
+    <h3>Output:</h3>
+    <div id="output"></div>
+
+    <script>
+    async function generateText() {
+        const text = document.getElementById("text").value;
+
+        const response = await fetch("/generate", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ text: text })
+        });
+
+        const data = await response.json();
+
+        console.log(data);
+
+        if (data.result) {
+            document.getElementById("output").innerText = data.result;
+        } else if (data.error) {
+            document.getElementById("output").innerText = "Error: " + data.error;
+        } else {
+            document.getElementById("output").innerText = "No response from server";
+        }
     }
-}
-</script>
+    </script>
+
+</body>
+</html>
