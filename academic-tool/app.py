@@ -1,38 +1,28 @@
 from flask import Flask, render_template, request, jsonify
 import requests
-import os
 
 app = Flask(__name__)
 
-# =====================
-# CONFIG
-# =====================
+# Hugging Face API (FIXED FORMAT)
 HF_API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
 
-HF_API_TOKEN = os.getenv("HF_API_TOKEN")
-
 headers = {
-    "Authorization": f"Bearer {HF_API_TOKEN}"
+    "Authorization": "Bearer YOUR_HF_TOKEN_HERE"
 }
 
-# =====================
-# HOME PAGE
-# =====================
 @app.route("/")
 def home():
     return render_template("index.html")
 
-# =====================
-# GENERATE API
-# =====================
+
 @app.route("/generate", methods=["POST"])
 def generate():
     try:
-        data = request.json or {}
+        data = request.json
         text = data.get("text")
 
         if not text:
-            return jsonify({"error": "No input text provided"}), 400
+            return jsonify({"error": "No input text"}), 400
 
         response = requests.post(
             HF_API_URL,
@@ -46,18 +36,10 @@ def generate():
                 "status": response.status_code
             }), 500
 
-        try:
-            result = response.json()
-        except Exception:
-            return jsonify({
-                "error": "Invalid JSON response",
-                "raw": response.text
-            }), 500
+        result = response.json()
 
-        if isinstance(result, list) and len(result) > 0:
-            return jsonify({
-                "result": result[0].get("generated_text", str(result))
-            })
+        if isinstance(result, list):
+            return jsonify({"result": result[0].get("generated_text", "")})
 
         return jsonify({"result": str(result)})
 
