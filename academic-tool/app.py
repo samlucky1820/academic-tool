@@ -1,11 +1,16 @@
 from flask import Flask, render_template, request, jsonify
-from openai import OpenAI
+import requests
 import os
 
 app = Flask(__name__)
 
-# OpenAI client (reads API key from Render environment variables)
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+HF_API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
+
+HF_API_TOKEN = os.getenv("HF_API_TOKEN")
+
+headers = {}
+if HF_API_TOKEN:
+    headers["Authorization"] = f"Bearer {HF_API_TOKEN}"
 
 @app.route("/")
 def home():
@@ -20,16 +25,19 @@ def generate():
         if not text:
             return jsonify({"error": "No input text provided"}), 400
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "user", "content": text}
-            ]
+        response = requests.post(
+            HF_API_URL,
+            headers=headers,
+            json={"inputs": text}
         )
 
-        return jsonify({
-            "result": response.choices[0].message.content
-        })
+        result = response.json()
+
+        # Extract response safely
+        if isinstance(result, list):
+            return jsonify({"result": result[0].get("generated_text", str(result))})
+
+        return jsonify({"result": str(result)})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
