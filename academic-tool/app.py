@@ -4,13 +4,14 @@ import os
 
 app = Flask(__name__)
 
-# Hugging Face API URL
+# ✅ Hugging Face Inference API (stable endpoint)
 HF_API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
 
-# API KEY from Render environment variables
+# ✅ API key from Render Environment Variables
 headers = {
     "Authorization": f"Bearer {os.getenv('HF_API_TOKEN')}"
 }
+
 
 @app.route("/")
 def home():
@@ -26,19 +27,21 @@ def generate():
         if not text:
             return jsonify({"error": "No input text provided"}), 400
 
+        # Call Hugging Face API
         response = requests.post(
             HF_API_URL,
             headers=headers,
             json={"inputs": text}
         )
 
-        # Handle API errors properly
+        # If Hugging Face returns error
         if response.status_code != 200:
             return jsonify({
                 "error": response.text,
                 "status": response.status_code
             }), 500
 
+        # Parse response safely
         try:
             result = response.json()
         except Exception:
@@ -47,7 +50,7 @@ def generate():
                 "raw": response.text
             }), 500
 
-        # Extract output safely
+        # Extract generated text
         if isinstance(result, list) and len(result) > 0:
             return jsonify({
                 "result": result[0].get("generated_text", "")
@@ -59,5 +62,6 @@ def generate():
         return jsonify({"error": str(e)}), 500
 
 
+# ✅ Required for Render (VERY IMPORTANT)
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
