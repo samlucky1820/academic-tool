@@ -1,34 +1,23 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Academic Writing Tool</title>
-</head>
-<body>
-
-<h2>Academic Writing Tool</h2>
-
-<textarea id="text" rows="10" cols="60" placeholder="Write or paste your text here..."></textarea>
-<br><br>
-
-<button onclick="generate()">Generate</button>
-
-<h3>Output:</h3>
-<pre id="output"></pre>
-
 <script>
-async function generate() {
+async function send() {
     const text = document.getElementById("text").value;
 
-    const res = await fetch("/generate", {
+    const response = await fetch("/generate", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({text})
     });
 
-    const data = await res.json();
-    document.getElementById("output").innerText = data.result;
+    const data = await response.json();
+
+    console.log(data); // 👈 VERY IMPORTANT
+
+    if (data.result) {
+        document.getElementById("result").innerText = data.result;
+    } else if (data.error) {
+        document.getElementById("result").innerText = "Error: " + data.error;
+    } else {
+        document.getElementById("result").innerText = "No response from server";
+    }
 }
 </script>
-
-</body>
-</html>
