@@ -1,23 +1,17 @@
 from flask import Flask, render_template, request, jsonify
 import requests
 import os
+import json
 
 app = Flask(__name__)
 
-# IMPORTANT: Use the FULL URL, not just /models/distilgpt2
-HF_API_URL = "https://api-inference.huggingface.co/models/distilgpt2"
+# Use the CORRECT Hugging Face API endpoint
+API_URL = "https://api-inference.huggingface.co/models/distilgpt2"
 
-# Get your token from environment variable
-HF_API_TOKEN = os.getenv('HF_API_TOKEN')
-
-# Check if token exists
-if not HF_API_TOKEN:
-    print("ERROR: HF_API_TOKEN environment variable not set!")
-    print("Please run: export HF_API_TOKEN='your_token_here'")
-    print("Get token from: https://huggingface.co/settings/tokens")
-
+# Your token (you've given permission)
 headers = {
-    "Authorization": f"Bearer {HF_API_TOKEN}"
+    "Authorization": "Bearer hf_YOUR_TOKEN_HERE",  # Replace with your actual token
+    "Content-Type": "application/json"
 }
 
 @app.route("/")
@@ -27,47 +21,64 @@ def home():
 @app.route("/generate", methods=["POST"])
 def generate():
     try:
+        # Get text from request
         data = request.get_json()
-        user_text = data.get('text', '')
+        user_input = data.get("text", "")
         
-        if not user_text:
+        if not user_input:
             return jsonify({"error": "Please enter some text"}), 400
         
-        print(f"Sending to Hugging Face: {user_text}")
-        print(f"URL: {HF_API_URL}")
-        print(f"Headers: Authorization: Bearer {HF_API_TOKEN[:10]}...")
+        print(f"📝 Generating for: {user_input}")
         
-        # Make the request to Hugging Face
+        # Prepare the payload
+        payload = {
+            "inputs": user_input,
+            "parameters": {
+                "max_length": 100,
+                "temperature": 0.7,
+                "do_sample": True
+            }
+        }
+        
+        # Make request to Hugging Face
         response = requests.post(
-            HF_API_URL,
+            API_URL,
             headers=headers,
-            json={"inputs": user_text},
-            timeout=60
+            json=payload,
+            timeout=30
         )
         
-        print(f"Response status: {response.status_code}")
+        print(f"✅ API Response Status: {response.status_code}")
         
+        # Check if request was successful
         if response.status_code == 200:
             result = response.json()
-            if isinstance(result, list) and len(result) > 0:
-                generated = result[0].get('generated_text', '')
-                # Remove the input text if it's included
-                if generated.startswith(user_text):
-                    generated = generated[len(user_text):]
-                return jsonify({"result": generated.strip()})
-            return jsonify({"result": str(result)})
-        else:
-            return jsonify({
-                "error": f"Hugging Face API returned {response.status_code}: {response.text[:200]}"
-            }), response.status_code
             
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": f"Network error: {str(e)}"}), 500
+            # Extract the generated text
+            if isinstance(result, list) and len(result) > 0:
+                generated_text = result[0].get("generated_text", "")
+                
+                # Remove the input text from the output if it's repeated
+                if generated_text.startswith(user_input):
+                    generated_text = generated_text[len(user_input):].strip()
+                
+                return jsonify({"result": generated_text})
+            else:
+                return jsonify({"result": str(result)})
+        else:
+            # Handle errors
+            error_msg = f"API Error {response.status_code}: {response.text}"
+            print(f"❌ {error_msg}")
+            return jsonify({"error": error_msg}), response.status_code
+            
+    except requests.exceptions.Timeout:
+        return jsonify({"error": "Request timed out. Please try again."}), 504
     except Exception as e:
+        print(f"❌ Server Error: {str(e)}")
         return jsonify({"error": f"Server error: {str(e)}"}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    print(f"Starting server on port {port}")
-    print(f"Using Hugging Face API: {HF_API_URL}")
+    print(f"🚀 Server running on http://localhost:{port}")
+    print(f"🔗 Using Hugging Face API: {API_URL}")
     app.run(host="0.0.0.0", port=port, debug=True)
