@@ -4,10 +4,21 @@ import os
 
 app = Flask(__name__)
 
+# IMPORTANT: Use the FULL URL, not just /models/distilgpt2
 HF_API_URL = "https://api-inference.huggingface.co/models/distilgpt2"
+
+# Get your token from environment variable
 HF_API_TOKEN = os.getenv('HF_API_TOKEN')
 
-headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
+# Check if token exists
+if not HF_API_TOKEN:
+    print("ERROR: HF_API_TOKEN environment variable not set!")
+    print("Please run: export HF_API_TOKEN='your_token_here'")
+    print("Get token from: https://huggingface.co/settings/tokens")
+
+headers = {
+    "Authorization": f"Bearer {HF_API_TOKEN}"
+}
 
 @app.route("/")
 def home():
@@ -17,38 +28,46 @@ def home():
 def generate():
     try:
         data = request.get_json()
+        user_text = data.get('text', '')
         
-        if not data or 'text' not in data:
-            return jsonify({"error": "Missing text field"}), 400
+        if not user_text:
+            return jsonify({"error": "Please enter some text"}), 400
         
-        user_text = data['text']
+        print(f"Sending to Hugging Face: {user_text}")
+        print(f"URL: {HF_API_URL}")
+        print(f"Headers: Authorization: Bearer {HF_API_TOKEN[:10]}...")
         
-        if not user_text.strip():
-            return jsonify({"error": "Text cannot be empty"}), 400
-        
+        # Make the request to Hugging Face
         response = requests.post(
             HF_API_URL,
             headers=headers,
             json={"inputs": user_text},
-            timeout=30
+            timeout=60
         )
         
-        if response.status_code != 200:
-            return jsonify({"error": f"API error: {response.text}"}), response.status_code
+        print(f"Response status: {response.status_code}")
         
-        result = response.json()
-        
-        if isinstance(result, list) and len(result) > 0:
-            generated = result[0].get('generated_text', '')
-            if generated.startswith(user_text):
-                generated = generated[len(user_text):].strip()
-            return jsonify({"result": generated or "No text generated"})
-        
-        return jsonify({"result": str(result)})
-        
+        if response.status_code == 200:
+            result = response.json()
+            if isinstance(result, list) and len(result) > 0:
+                generated = result[0].get('generated_text', '')
+                # Remove the input text if it's included
+                if generated.startswith(user_text):
+                    generated = generated[len(user_text):]
+                return jsonify({"result": generated.strip()})
+            return jsonify({"result": str(result)})
+        else:
+            return jsonify({
+                "error": f"Hugging Face API returned {response.status_code}: {response.text[:200]}"
+            }), response.status_code
+            
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": f"Network error: {str(e)}"}), 500
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
+    print(f"Starting server on port {port}")
+    print(f"Using Hugging Face API: {HF_API_URL}")
     app.run(host="0.0.0.0", port=port, debug=True)
